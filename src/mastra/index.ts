@@ -18,6 +18,7 @@
  */
 
 import { homedir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Mastra } from '@mastra/core/mastra';
 import { LibSQLFactoryStorage } from '@mastra/libsql';
@@ -35,6 +36,7 @@ import { parseAuthorizedBotsEnv } from '@mastra/factory/integrations/github/webh
 import { LinearIntegration } from '@mastra/factory/integrations/linear/integration';
 import { SlackIntegration } from '@mastra/factory/integrations/slack/integration';
 import type { IMastraAuthProvider } from '@mastra/core/server';
+import { OwnerAuth } from './owner-auth';
 
 /**
  * Parse a positive-integer env knob; anything else means "use the default".
@@ -130,7 +132,15 @@ const authDisabled = process.env.MASTRACODE_AUTH_DISABLED === '1';
 const workosConfigured = Boolean(process.env.WORKOS_API_KEY?.trim() && process.env.WORKOS_CLIENT_ID?.trim());
 let auth: IMastraAuthProvider | null | undefined;
 
-if (authDisabled) {
+const ownerToken = process.env.FACTORY_OWNER_TOKEN ?? (process.env.FACTORY_OWNER_TOKEN_FILE
+  ? readFileSync(process.env.FACTORY_OWNER_TOKEN_FILE, 'utf8').trim()
+  : undefined);
+if (ownerToken) {
+  if (authDisabled || workosConfigured || process.env.MASTRA_SHARED_API_URL) {
+    throw new Error('Owner access cannot be combined with another auth configuration.');
+  }
+  auth = new OwnerAuth(ownerToken);
+} else if (authDisabled) {
   auth = null;
 } else if (process.env.MASTRA_SHARED_API_URL?.trim()) {
   if (workosConfigured) {
@@ -253,6 +263,7 @@ const vector = databaseUrl ? new PgVector({ id: 'mastra-code-vectors', connectio
 // a stable signer. Unset → per-process random secret (single-process local dev
 // only).
 const stateSecret =
+  process.env.FACTORY_STATE_SECRET ||
   process.env.GITHUB_APP_WEBHOOK_SECRET ||
   process.env.WORKOS_COOKIE_PASSWORD ||
   process.env.SLACK_APP_SIGNING_SECRET ||

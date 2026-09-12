@@ -1,0 +1,10 @@
+.git
+node_modules
+.mastra
+src/mastra/public
+.env
+.env.*
+!.env.example
+!.env.schema
+.artifacts
+*.log

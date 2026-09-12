@@ -6,6 +6,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "dev": "mastra factory dev --dir src/mastra",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
