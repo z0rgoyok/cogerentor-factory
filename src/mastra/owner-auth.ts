@@ -33,4 +33,38 @@ export class OwnerAuth extends SimpleAuth<typeof OWNER> {
     const result = await super.signIn(email, password, request);
     return { ...result, cookies: result.cookies?.map(cookie => `${cookie}; Secure`) };
   }
+
+  /** Factory's credential form uses the better-auth-shaped HTTP endpoints. */
+  async handleAuthRequest(request: Request): Promise<Response> {
+    const path = new URL(request.url).pathname;
+    const origin = request.headers.get('Origin');
+    if (origin && origin !== 'https://factory.cogerentor.com') {
+      return Response.json({ message: 'Invalid origin' }, { status: 403 });
+    }
+    if (request.method === 'POST' && path === '/auth/api/sign-in/email') {
+      if (origin !== 'https://factory.cogerentor.com') {
+        return Response.json({ message: 'Origin required' }, { status: 403 });
+      }
+      try {
+        const { email, password } = await request.json() as Record<string, unknown>;
+        if (email !== OWNER.email || typeof password !== 'string') {
+          return Response.json({ message: 'Invalid email or password' }, { status: 401 });
+        }
+        const result = await this.signIn(email, password, request);
+        const headers = new Headers({ 'Cache-Control': 'no-store' });
+        for (const cookie of result.cookies ?? []) headers.append('Set-Cookie', cookie);
+        // The credential remains in the HttpOnly cookie, never in a JSON body.
+        return Response.json({ user: result.user }, { headers });
+      } catch {
+        return Response.json({ message: 'Invalid email or password' }, { status: 401 });
+      }
+    }
+    if (request.method === 'POST' && path === '/auth/api/sign-out') {
+      return Response.json({ ok: true }, { headers: {
+        'Set-Cookie': 'mastra-token=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0',
+        'Cache-Control': 'no-store',
+      } });
+    }
+    return Response.json({ message: 'Not found' }, { status: 404 });
+  }
 }

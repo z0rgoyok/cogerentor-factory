@@ -12,6 +12,7 @@
     "db:down": "docker compose down",
     "check": "tsc --noEmit",
     "build": "mastra build --dir src/mastra",
+    "postbuild": "node scripts/prepare-owner-signin.mjs",
     "start": "varlock run -- mastra start",
     "deploy": "mastra deploy"
   },
